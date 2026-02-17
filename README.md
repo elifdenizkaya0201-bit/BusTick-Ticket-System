@@ -1,73 +1,36 @@
+# 🚌 BusTick - Bus Ticketing Automation (Database-First)
 
-# BustickWeb – CMPE232 Project
+This is a bus reservation system I developed for my **CMPE 232 Database Systems** course. In this project, I followed a **Database-First** approach, meaning I designed and built the entire database in SQL Server before writing any application code.
 
-This project was developed for the **CMPE232 – Database Systems** course. 
- 
-It is a simple web-based bus ticket system that demonstrates how a relational database can be integrated with a web application.
+## 🏛 How I Built the Database
 
-The system includes basic administrative functionalities, such as creating and managing trips, and focuses primarily on proper database design, relationships, and CRUD operations.
+<img width="1644" height="1620" alt="EntityDesignerDiagram" src="https://github.com/user-attachments/assets/b38d9317-0ce1-49f4-b1b0-3bc49db25f12" />
 
----
+I focused heavily on the relational design to ensure the schema follows **BCNF** standards. I scripted everything in the database manually:
 
-## Libraries and Technologies Used
+* **Tables & Logic:** I created the tables with strict `CHECK` constraints (for example, ensuring arrival time is always after departure time) and managed all Primary/Foreign Key relationships myself.
+* **Performance with Indices:** To speed up trip searches, I added strategic indices on columns like `DepartureTime`.
+* **Automation with Triggers:** I wrote several triggers to handle background tasks, such as `TRG_UpdateSeatStatus` for managing seat availability.
+* **Simplifying with Views:** I created SQL Views like `v_PassengerTickets` to pull complex data more efficiently.
+* **Data Testing:** I generated and inserted a comprehensive set of mock data to test real-world scenarios.
 
-### Backend
-- **.NET 8**
-- **ASP.NET Core**
-- **Blazor Server**
-- **Entity Framework Core**
-- **Microsoft.EntityFrameworkCore.SqlServer**
+## 🛠 Tech Stack
+* **Database:** MS SQL Server
+* **Backend:** ASP.NET Core with Entity Framework (Database-First)
+* **Frontend:** Blazor / Razor Pages
 
-### Database
-- **Microsoft SQL Server**
-- **SQL Server Management Studio (SSMS)**
-
-### Frontend
-- **Blazor Components**
-
----
-
-## How to Run the Application
-
+## 🚀 How to Run the Application
 ### Requirements
-Before running the project, make sure you have:
-- .NET 8 SDK installed
-- SQL Server installed
-- Visual Studio 2022 with ASP.NET workload
-
----
+* .NET 8 SDK
+* SQL Server & SSMS
+* Visual Studio 2022
 
 ### Database Setup
 1. Open **SQL Server Management Studio (SSMS)**.
-2. Create a new database named: BusTick
-3. Run the provided SQL scripts to create the tables, schemas, and relationships.
-4. Ensure that the database is running before starting the application.
-
----
-
-### Connection String Configuration
-The database connection is defined in the `appsettings.json` file.
-
-```json
-"ConnectionStrings": {
-"DefaultConnection": "Server=.;Database=BusTick;Trusted_Connection=True;TrustServerCertificate=True;"
-}
-If your SQL Server instance name is different, update the Server value accordingly.
+2. Create a new database named `BusTick`.
+3. Run the provided SQL scripts (found in the project files) to create tables, triggers, and views.
 
 ### Running the Project
-
-Open the solution file (.sln) in Visual Studio.
-
-Set BustickWeb as the startup project.
-
-Press F5 or click Run.
-
-The application will open automatically in your browser.
-
-### Project Overview
-
-The application includes basic admin functionalities such as creating, editing, and deleting trips.
-
-Foreign key relationships are enforced to maintain data integrity.
-
-Dropdown menus are used instead of manual ID input to improve usability.
+1. Open the `.sln` file in Visual Studio.
+2. Update the connection string in `appsettings.json` if necessary.
+3. Set `BustickWeb` as the startup project and press **F5**.
