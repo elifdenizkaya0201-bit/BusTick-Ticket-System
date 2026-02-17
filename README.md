@@ -2,7 +2,7 @@
 
 This is a bus reservation system I developed for my **CMPE 232 Database Systems** course. In this project, I followed a **Database-First** approach, meaning I designed and built the entire database in SQL Server before writing any application code.
 
-## 🏛 How I Built the Database
+## How I Built the Database
 
 <img width="1644" height="1620" alt="EntityDesignerDiagram" src="https://github.com/user-attachments/assets/b38d9317-0ce1-49f4-b1b0-3bc49db25f12" />
 
@@ -14,12 +14,12 @@ I focused heavily on the relational design to ensure the schema follows **BCNF**
 * **Simplifying with Views:** I created SQL Views like `v_PassengerTickets` to pull complex data more efficiently.
 * **Data Testing:** I generated and inserted a comprehensive set of mock data to test real-world scenarios.
 
-## 🛠 Tech Stack
+## Tech Stack
 * **Database:** MS SQL Server
 * **Backend:** ASP.NET Core with Entity Framework (Database-First)
 * **Frontend:** Blazor / Razor Pages
 
-## 🚀 How to Run the Application
+## How to Run the Application
 ### Requirements
 * .NET 8 SDK
 * SQL Server & SSMS
