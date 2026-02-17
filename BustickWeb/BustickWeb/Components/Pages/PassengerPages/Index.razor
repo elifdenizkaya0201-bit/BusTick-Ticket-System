@@ -1,0 +1,93 @@
+﻿@page "/passengers"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using DataAccess
+@using BustickWeb.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<BustickWebContext> DbFactory
+
+<PageTitle>Passengers</PageTitle>
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Manage Passengers</h2>
+
+        <a class="btn btn-dark"
+           href="/passengers/create">
+            Add Passenger
+        </a>
+    </div>
+
+    <QuickGrid Class="table table-striped table-hover shadow-sm"
+               Items="passengerList">
+
+        <PropertyColumn Property="p => p.FullName"
+                        Title="Full Name"
+                        Sortable="true" />
+
+        <PropertyColumn Property="p => p.Email"
+                        Title="Email" />
+
+        <PropertyColumn Property="p => p.Phone"
+                        Title="Phone" />
+
+        <PropertyColumn Property="p => p.BirthDate"
+                        Title="Birth Date"
+                        Format="dd.MM.yyyy" />
+
+        <TemplateColumn Context="p">
+            <a class="btn btn-sm btn-outline-secondary me-1"
+               href="@($"/passengers/details?id={p.Id}")">
+                Details
+            </a>
+
+            <a class="btn btn-sm btn-outline-primary me-1"
+               href="@($"/passengers/edit?id={p.Id}")">
+                Edit
+            </a>
+
+            <a class="btn btn-sm btn-outline-danger"
+               href="@($"/passengers/delete?id={p.Id}")">
+                Delete
+            </a>
+        </TemplateColumn>
+
+    </QuickGrid>
+
+</div>
+
+@code {
+    private BustickWebContext context = default!;
+    private IQueryable<PassengerRow> passengerList = default!;
+
+    protected override void OnInitialized()
+    {
+        context = DbFactory.CreateDbContext();
+
+        passengerList =
+            from p in context.Passengers
+            join u in context.AppUser
+                on p.Id equals u.Id
+            select new PassengerRow
+            {
+                Id = p.Id,
+                FullName = u.FullName,
+                Email = u.Email,
+                Phone = u.Phone,
+                BirthDate = p.BirthDate
+            };
+    }
+
+    public async ValueTask DisposeAsync()
+        => await context.DisposeAsync();
+
+    class PassengerRow
+    {
+        public int Id { get; set; }
+        public string? FullName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public DateTime? BirthDate { get; set; }
+    }
+}

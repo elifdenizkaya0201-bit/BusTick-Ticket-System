@@ -1,0 +1,63 @@
+﻿@page "/login"
+@rendermode InteractiveServer
+@layout LoginLayout
+@inject BustickWeb.Data.BustickWebContext _context
+@inject NavigationManager Nav
+
+<div class="login-page">
+
+    <div class="login-hero">
+        <div class="auth-logo">BusTick</div>
+        <h1>Welcome to BusTick</h1>
+    </div>
+
+    <div class="login-card">
+        <div class="login-card-title">
+            Login to your account
+        </div>
+
+        <div class="login-form">
+
+            <div class="form-field">
+                <label>Email</label>
+                <input type="email" @bind="email" />
+            </div>
+
+            <div class="form-field">
+                <label>Password</label>
+                <input type="password" @bind="password" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <div style="color:red">@error</div>
+            }
+
+            <button class="login-btn" @onclick="DoLogin">
+                Login
+            </button>
+
+        </div>
+    </div>
+
+</div>
+
+@code {
+    string? email;
+    string? password;
+    string? error;
+
+    void DoLogin()
+    {
+        var user = _context.AppUser
+            .FirstOrDefault(u => u.Email == email && u.Password == password);
+
+        if (user == null)
+        {
+            error = "Wrong email or password";
+            return;
+        }
+
+        Nav.NavigateTo("/dashboard", true);
+    }
+}

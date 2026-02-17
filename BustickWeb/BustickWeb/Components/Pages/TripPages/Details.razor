@@ -1,0 +1,136 @@
+﻿@page "/trips/details/{Id:int}"
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@inject IDbContextFactory<BustickWeb.Data.BustickWebContext> DbFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Trip Details</PageTitle>
+
+<div class="container py-4">
+    <div class="mb-4">
+        <a href="/trips" class="text-decoration-none text-muted">
+            <i class="bi bi-arrow-left"></i> Back to Manage Trips
+        </a>
+    </div>
+
+    @if (trip is null)
+    {
+        <div class="d-flex justify-content-center align-items-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm overflow-hidden" style="max-width: 800px; margin: 0 auto;">
+
+            <div class="card-header bg-white p-4 border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted text-uppercase small mb-1">Route</h6>
+                        <h2 class="mb-0 fw-bold">@trip.Route.OriginCity <span class="text-muted mx-2">→</span> @trip.Route.DestinationCity</h2>
+                    </div>
+                    <div>
+                        <span class="badge rounded-pill bg-@GetStatusColor(trip.Status) fs-6 px-3 py-2">
+                            @trip.Status
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body p-4">
+                <div class="row g-5">
+
+                    <div class="col-md-6 border-end-md">
+                        <h5 class="fw-bold mb-3 text-primary">Schedule</h5>
+
+                        <div class="mb-4">
+                            <label class="small text-muted fw-bold">DEPARTURE</label>
+                            <div class="fs-5">@trip.DepartureTime.ToString("dd MMMM yyyy")</div>
+                            <div class="fs-4 fw-bold">@trip.DepartureTime.ToString("HH:mm")</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small text-muted fw-bold">ARRIVAL</label>
+                            <div class="fs-5">@trip.ArrivalTime.ToString("dd MMMM yyyy")</div>
+                            <div class="fs-4 fw-bold">@trip.ArrivalTime.ToString("HH:mm")</div>
+                        </div>
+
+                        <div class="alert alert-light border mt-3 d-inline-block">
+                            <i class="bi bi-clock"></i> Duration: <strong>@GetDuration(trip.DepartureTime, trip.ArrivalTime)</strong>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <h5 class="fw-bold mb-3 text-primary">Operational Info</h5>
+
+                        <div class="mb-3">
+                            <label class="small text-muted fw-bold">OPERATOR</label>
+                            <div class="fs-5">@trip.Operator.CompanyName</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small text-muted fw-bold">BUS PLATE</label>
+                            <div class="fs-5 font-monospace">@trip.Bus.PlateNo</div>
+                            <div class="small text-muted">@trip.Bus.Model</div>
+                        </div>
+
+                        <hr class="my-4" />
+
+                        <div class="mb-3">
+                            <label class="small text-muted fw-bold">TICKET PRICE</label>
+                            <div class="fs-2 fw-bold text-success">@trip.Price.ToString("C2")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-footer bg-light p-3 d-flex justify-content-end gap-2">
+                <a href="/trips" class="btn btn-outline-secondary">Close</a>
+                <a href="@($"/trips/edit/{trip.Id}")" class="btn btn-primary px-4">Edit Trip</a>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private Trip? trip;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = await DbFactory.CreateDbContextAsync();
+
+        trip = await context.Trip
+            .Include(t => t.Route)
+            .Include(t => t.Bus)
+            .Include(t => t.Operator)
+            .FirstOrDefaultAsync(t => t.Id == Id);
+
+        if (trip is null)
+        {
+            NavigationManager.NavigateTo("/not-found");
+        }
+    }
+
+    private string GetStatusColor(string? status)
+    {
+        return status?.ToLower() switch
+        {
+            "completed" => "success",
+            "cancelled" => "danger",
+            "scheduled" => "primary",
+            "delayed" => "warning",
+            _ => "secondary"
+        };
+    }
+
+    private string GetDuration(DateTime start, DateTime end)
+    {
+        var span = end - start;
+        return $"{(int)span.TotalHours}h {span.Minutes}m";
+    }
+}

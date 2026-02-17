@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="BustickWeb/BustickWeb.Client/BustickWeb.Client.csproj" />
+  <Project Path="BustickWeb/BustickWeb/BustickWeb.csproj" />
+  <Project Path="DataAccess/DataAccess.csproj" Id="1c809766-b54c-4ee7-a0f1-906f0895db26" />
+</Solution>

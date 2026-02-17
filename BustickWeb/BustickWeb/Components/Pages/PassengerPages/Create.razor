@@ -1,0 +1,77 @@
+﻿@page "/passengers/create"
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@using BustickWeb.Data
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Create Passenger</PageTitle>
+
+<h3>Create New Passenger</h3>
+
+<div class="row">
+    <div class="col-md-6">
+        <EditForm Model="passenger" OnValidSubmit="AddPassenger">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <InputText @bind-Value="appUser.FullName" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <InputText @bind-Value="appUser.Email" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <InputText type="password" @bind-Value="appUser.Password" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Phone</label>
+                <InputText @bind-Value="appUser.Phone" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Birth Date</label>
+                <InputDate @bind-Value="passenger.BirthDate" class="form-control" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                Create Passenger
+            </button>
+
+            <a href="/admin/passengers" class="btn btn-secondary ms-2">
+                Cancel
+            </a>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    Passenger passenger = new();
+    AppUser appUser = new();
+
+    async Task AddPassenger()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        appUser.Status = "active";
+        appUser.CreatedAt = DateTime.Now;
+        appUser.UpdatedAt = DateTime.Now;
+
+        context.AppUser.Add(appUser);
+        await context.SaveChangesAsync();
+
+        passenger.Id = appUser.Id;
+        passenger.AppUser = null!;
+
+        context.Passengers.Add(passenger);
+        await context.SaveChangesAsync();
+
+        Nav.NavigateTo("/admin/passengers");
+    }
+}

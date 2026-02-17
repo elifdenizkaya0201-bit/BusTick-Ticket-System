@@ -1,0 +1,106 @@
+﻿@page "/trips/edit/{Id:int}"
+@rendermode InteractiveServer
+
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@using BustickWeb.Data
+
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Edit Trip</PageTitle>
+
+<div class="container py-4">
+    <h3>Edit Trip</h3>
+
+    @if (_trip == null)
+    {
+        <div class="alert alert-info">Loading trip details...</div>
+    }
+    else
+    {
+        <EditForm Model="_trip" OnValidSubmit="SaveTrip" FormName="EditTripForm">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="card p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Departure Time</label>
+                    <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="_trip.DepartureTime" class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Arrival Time</label>
+                    <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="_trip.ArrivalTime" class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Price</label>
+                    <InputNumber @bind-Value="_trip.Price" class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Status</label>
+                    <InputSelect @bind-Value="_trip.Status" class="form-select">
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Delayed">Delayed</option>
+                    </InputSelect>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-success">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                </div>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Trip? _trip;
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+
+        // Fetch
+        _trip = await db.Trip.FirstOrDefaultAsync(t => t.Id == Id);
+
+        if (_trip == null)
+        {
+
+            Nav.NavigateTo("/trips");
+        }
+    }
+
+    private async Task SaveTrip()
+    {
+        if (_trip == null) return;
+
+        try
+        {
+            using var db = await DbFactory.CreateDbContextAsync();
+
+            // Update
+            db.Trip.Update(_trip);
+            await db.SaveChangesAsync();
+
+            Nav.NavigateTo("/trips");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving trip: {ex.Message}");
+        }
+    }
+
+    private void Cancel()
+    {
+
+        Nav.NavigateTo("/trips");
+    }
+}

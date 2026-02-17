@@ -1,0 +1,165 @@
+﻿@page "/seat-selection/{TripId:int}"
+@rendermode InteractiveServer
+
+@using System.Linq
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@using BustickWeb.Data
+@using System.Globalization
+@using Microsoft.AspNetCore.Components
+
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject NavigationManager Nav
+
+<div class="container py-4">
+    <button class="btn btn-outline-secondary mb-3" @onclick="GoBack">← Go Back</button>
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    else if (trip == null)
+    {
+        <div class="text-center">Loading...</div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-7">
+                <div class="card p-4 border-0 shadow-sm">
+                    <h5 class="mb-3">Seat Selection</h5>
+
+                    <div class="mb-4 text-muted small">
+                        Please select a seat below.
+                    </div>
+
+                    <div class="d-flex justify-content-center bg-light p-4 rounded">
+                        <div class="seat-grid" style="display: grid; grid-template-columns: repeat(4, 50px); gap: 10px;">
+                            <div class="grid-col-1 fw-bold text-muted mb-3" style="grid-column: span 4; text-align:center;">Driver</div>
+
+                            @for (int i = 1; i <= trip.SeatCapacity; i++)
+                            {
+                                var seatNum = i;
+                                var isOccupied = occupiedSeats.Contains(seatNum);
+                                var isSelected = selectedSeat == seatNum;
+                                var btnClass = isOccupied ? "btn-secondary disabled" : (isSelected ? "btn-success" : "btn-outline-dark");
+
+                                <button class="btn @btnClass" style="width:50px; height:50px;"
+                                        disabled="@isOccupied"
+                                        @onclick="() => SelectSeat(seatNum)">
+                                    @seatNum
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                <div class="card p-4 border-0 shadow-sm">
+                    <h5 class="mb-3">Trip Details</h5>
+                    <div class="mb-2">
+                        <span class="text-muted">Route:</span>
+                        <strong>@trip.OriginCity → @trip.DestinationCity</strong>
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Date:</span>
+                        <strong>@trip.DepartureTime.ToString("dd MMMM yyyy HH:mm", CultureInfo.InvariantCulture)</strong>
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Operator:</span>
+                        <strong>@trip.OperatorName</strong>
+                    </div>
+                    <hr />
+                    <div class="mb-3">
+                        <span class="text-muted">Selected Seat:</span>
+                        <strong class="fs-5">@(selectedSeat.HasValue? selectedSeat.ToString() : "-")</strong>
+                    </div>
+                    <div class="mb-4">
+                        <span class="text-muted">Total:</span>
+                        <strong class="fs-4 text-primary">@trip.Price.ToString("C2", CultureInfo.CreateSpecificCulture("en-US"))</strong>
+                    </div>
+
+                    <button class="btn btn-dark w-100 py-2" disabled="@(!selectedSeat.HasValue)" @onclick="GoToPayment">
+                        Proceed to Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int TripId { get; set; }
+
+    private TripInfoVM? trip;
+    private HashSet<int> occupiedSeats = new();
+    private int? selectedSeat;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var db = await DbFactory.CreateDbContextAsync();
+
+            var t = await db.Trip
+                .Include(x => x.Route)
+                .Include(x => x.Operator)
+                .Include(x => x.Bus)
+                .FirstOrDefaultAsync(x => x.Id == TripId);
+
+            if (t == null)
+            {
+                errorMessage = "Trip not found.";
+                return;
+            }
+
+            trip = new TripInfoVM
+            {
+                OriginCity = t.Route.OriginCity,
+                DestinationCity = t.Route.DestinationCity,
+                DepartureTime = t.DepartureTime,
+                OperatorName = t.Operator.CompanyName,
+                Price = t.Price,
+                SeatCapacity = t.Bus.SeatCapacity
+            };
+
+            occupiedSeats = (await db.Set<Ticket>()
+                .Where(tk => tk.TripId == TripId && tk.TicketStatus != "Cancelled")
+                .Select(tk => tk.SeatNo)
+                .ToListAsync())
+                .ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Error: " + ex.Message;
+        }
+    }
+
+    private void SelectSeat(int seatNo)
+    {
+        if (occupiedSeats.Contains(seatNo)) return;
+        selectedSeat = seatNo;
+    }
+
+    private void GoToPayment()
+    {
+        if (selectedSeat.HasValue)
+        {
+            Nav.NavigateTo($"/payment?tripId={TripId}&seatNo={selectedSeat}");
+        }
+    }
+
+    private void GoBack() => Nav.NavigateTo("/trip-selection");
+
+    class TripInfoVM
+    {
+        public string OriginCity { get; set; } = "";
+        public string DestinationCity { get; set; } = "";
+        public DateTime DepartureTime { get; set; }
+        public string OperatorName { get; set; } = "";
+        public decimal Price { get; set; }
+        public int SeatCapacity { get; set; }
+    }
+}

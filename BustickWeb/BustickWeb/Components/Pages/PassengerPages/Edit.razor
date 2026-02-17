@@ -1,0 +1,103 @@
+﻿@page "/passengers/edit"
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@using BustickWeb.Data
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Edit Passenger</PageTitle>
+
+<h3>Edit Passenger</h3>
+
+@if (passenger == null || appUser == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-6">
+
+            <!-- 🔴 EN KRİTİK SATIR -->
+            <EditForm Model="passenger"
+                      OnValidSubmit="UpdatePassenger">
+
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <div class="mb-3">
+                    <label class="form-label">Full Name</label>
+                    <InputText @bind-Value="appUser.FullName"
+                               class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <InputText @bind-Value="appUser.Email"
+                               class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Phone</label>
+                    <InputText @bind-Value="appUser.Phone"
+                               class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Birth Date</label>
+                    <InputDate @bind-Value="passenger.BirthDate"
+                               class="form-control" />
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    Save
+                </button>
+
+                <a class="btn btn-secondary ms-2"
+                   href="/passengers">
+                    Back to List
+                </a>
+
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    Passenger? passenger;
+    AppUser? appUser;
+
+    [SupplyParameterFromQuery]
+    public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        passenger = await context.Passengers
+            .FirstOrDefaultAsync(p => p.Id == Id);
+
+        if (passenger == null)
+        {
+            Nav.NavigateTo("/passengers");
+            return;
+        }
+
+        appUser = await context.AppUser
+            .FirstOrDefaultAsync(u => u.Id == passenger.Id);
+    }
+
+    async Task UpdatePassenger()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        context.Entry(appUser!).State = EntityState.Modified;
+        context.Entry(passenger!).State = EntityState.Modified;
+
+        appUser!.UpdatedAt = DateTime.Now;
+
+        await context.SaveChangesAsync();
+
+        Nav.NavigateTo("/passengers");
+    }
+}

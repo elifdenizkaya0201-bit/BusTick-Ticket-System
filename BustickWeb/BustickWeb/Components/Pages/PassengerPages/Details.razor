@@ -1,0 +1,86 @@
+﻿@page "/passengers/details"
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@using BustickWeb.Data
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Passenger Details</PageTitle>
+
+<h3>Passenger Details</h3>
+
+@if (passenger == null || appUser == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-body">
+
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Full Name</dt>
+                <dd class="col-sm-9">@appUser.FullName</dd>
+
+                <dt class="col-sm-3">Email</dt>
+                <dd class="col-sm-9">@appUser.Email</dd>
+
+                <dt class="col-sm-3">Phone</dt>
+                <dd class="col-sm-9">@appUser.Phone</dd>
+
+                <dt class="col-sm-3">Birth Date</dt>
+                <dd class="col-sm-9">
+                    @passenger.BirthDate?.ToString("dd.MM.yyyy")
+                </dd>
+            </dl>
+
+            <div class="mt-4 d-flex gap-2">
+                <button class="btn btn-primary"
+                        @onclick="GoToEdit">
+                    Edit
+                </button>
+
+                <button class="btn btn-outline-secondary"
+                        @onclick="GoToList">
+                    Back
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    Passenger? passenger;
+    AppUser? appUser;
+
+    [SupplyParameterFromQuery]
+    public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        passenger = await context.Passengers
+            .FirstOrDefaultAsync(p => p.Id == Id);
+
+        if (passenger == null)
+        {
+            Nav.NavigateTo("/passengers");
+            return;
+        }
+
+        appUser = await context.AppUser
+            .FirstOrDefaultAsync(u => u.Id == passenger.Id);
+    }
+
+    void GoToEdit()
+    {
+        Nav.NavigateTo($"/passengers/edit?id={passenger!.Id}");
+    }
+
+    void GoToList()
+    {
+        Nav.NavigateTo("/passengers");
+    }
+}

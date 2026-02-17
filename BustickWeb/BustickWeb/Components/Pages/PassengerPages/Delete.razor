@@ -1,0 +1,80 @@
+﻿@page "/passengers/delete"
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@using BustickWeb.Data
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Delete Passenger</PageTitle>
+
+<h3>Delete Passenger</h3>
+
+@if (passenger == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="alert alert-warning">
+        <p>
+            Are you sure you want to delete this passenger?
+        </p>
+        <strong>@appUser?.FullName</strong>
+    </div>
+
+    <EditForm Model="passenger"
+              OnValidSubmit="DeletePassenger">
+
+        <button type="submit"
+                class="btn btn-danger">
+            Delete
+        </button>
+
+        <a class="btn btn-secondary ms-2"
+           href="/passengers">
+            Cancel
+        </a>
+
+    </EditForm>
+}
+
+@code {
+    Passenger? passenger;
+    AppUser? appUser;
+
+    [SupplyParameterFromQuery]
+    public int Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        passenger = await context.Passengers
+            .FirstOrDefaultAsync(p => p.Id == Id);
+
+        if (passenger == null)
+        {
+            Nav.NavigateTo("/passengers");
+            return;
+        }
+
+        appUser = await context.AppUser
+            .FirstOrDefaultAsync(u => u.Id == passenger.Id);
+    }
+
+    async Task DeletePassenger()
+    {
+        using var context = DbFactory.CreateDbContext();
+
+        // Önce Passenger
+        context.Passengers.Remove(passenger!);
+
+        // Sonra AppUser
+        if (appUser != null)
+            context.AppUser.Remove(appUser);
+
+        await context.SaveChangesAsync();
+
+        Nav.NavigateTo("/passengers");
+    }
+}

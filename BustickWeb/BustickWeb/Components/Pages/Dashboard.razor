@@ -1,0 +1,436 @@
+﻿@page "/dashboard"
+
+@using BustickWeb.Data
+@using Microsoft.EntityFrameworkCore;
+
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject Radzen.TooltipService TooltipService
+
+@rendermode InteractiveServer
+@using Radzen
+@using Radzen.Blazor
+
+<PageTitle>Dashboard</PageTitle>
+
+<h3 class="mb-4">Operator Dashboard</h3>
+
+@code {
+    private BustickWebContext? Db;
+
+    private List<AvgRatingOverTimeDto> AvgRatingOverTime= new();
+
+    private int totalTripCount;
+
+    public class TripStatusCount
+    {
+        public string Status { get; set; } = "";
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+    }
+
+    private List<TripStatusCount> tripStatusData = new();
+    private string? selectedTripStatus = null;
+
+    public enum TimeFilter
+    {
+        Daily,
+        Weekly,
+        Monthly
+    }
+
+    private TimeFilter selectedFilter = TimeFilter.Monthly;
+
+    private async Task ChangeFilter(TimeFilter filter)
+    {
+        selectedFilter = filter;
+        await LoadAverageRatingOverTimeAsync();
+    }
+
+    // KPIs
+    private int totalBuses;
+    private int activeTrips;
+    private int totalPassengers;
+    private double averageRating;
+
+    private List<DataAccess.Trip> upcomingTrips = new();
+    private List<DataAccess.Trip> pastTrips = new();
+
+    // Chart Data Models
+    public class RatingCount
+    {
+        public string Star { get; set; } = "";
+        public int Count { get; set; }
+    }
+
+    public class RatingTrend
+    {
+        public string DateLabel { get; set; } = "";
+        public double AverageRating { get; set; }
+    }
+
+    public class TripCount
+    {
+        public DateTime Date { get; set; }
+        public int Count { get; set; }
+    }
+
+    private List<RatingCount> ratingData = new();
+    private List<RatingTrend> ratingTrendData = new();
+    private List<TripCount> tripCountData = new();
+
+    private async Task FilterTripsByStatus(string? status)
+    {
+        if (Db == null) return;
+
+        var query = Db.Trip
+            .Include(t => t.Route)
+            .Where(t => t.DepartureTime < DateTime.Now)
+            .OrderByDescending(t => t.DepartureTime)
+            .AsQueryable();
+
+        if (!string.IsNullOrEmpty(status))
+            query = query.Where(t => t.Status == status);
+
+        pastTrips = await query.Take(8).ToListAsync();
+    }
+
+    //Initialization
+    protected override async Task OnInitializedAsync()
+    {
+        Db = await DbFactory.CreateDbContextAsync();
+
+        totalBuses = await Db.Buses.CountAsync();
+        totalPassengers = await Db.Passengers.CountAsync();
+        activeTrips = await Db.Trip.CountAsync(t => t.DepartureTime >= DateTime.Now);
+
+        averageRating = await Db.Reviews.AnyAsync()
+            ? await Db.Reviews.AverageAsync(r => r.Rating)
+            : 0;
+
+        var raw = await Db.Trip
+     .GroupBy(t => t.Status)
+     .Select(g => new
+     {
+         Status = g.Key,
+         Count = g.Count()
+     })
+     .ToListAsync();
+
+        var total = raw.Sum(x => x.Count);
+
+        tripStatusData = raw.Select(x => new TripStatusCount
+        {
+            Status = x.Status,
+            Count = x.Count,
+            Percentage = total == 0 ? 0 : (double)x.Count / total * 100
+        }).ToList();
+
+        tripStatusData = await Db.Trip
+            .GroupBy(t => t.Status)
+            .Select(g => new TripStatusCount
+            {
+                Status = g.Key,
+                Count = g.Count()
+            })
+            .ToListAsync();
+
+        totalTripCount = tripStatusData.Sum(x => x.Count);
+
+        foreach (var item in tripStatusData)
+        {
+            item.Percentage = totalTripCount == 0
+                ? 0
+                : (double)item.Count / totalTripCount * 100;
+        }
+
+
+        totalTripCount = tripStatusData.Sum(x => x.Count);
+
+     //Trip Lists
+        upcomingTrips = await Db.Trip
+            .Include(t => t.Route)
+            .Where(t => t.DepartureTime >= DateTime.Now)
+            .OrderBy(t => t.DepartureTime)
+            .Take(4)
+            .ToListAsync();
+
+        pastTrips = await Db.Trip
+            .Include(t => t.Route)
+            .Where(t => t.DepartureTime < DateTime.Now)
+            .OrderByDescending(t => t.DepartureTime)
+            .Take(9)
+            .ToListAsync();
+
+        var rawRatings = await Db.Reviews
+            .GroupBy(r => r.Rating)
+            .Select(g => new
+            {
+                Rating = g.Key,
+                Count = g.Count()
+            })
+            .OrderByDescending(x => x.Rating)
+            .ToListAsync();
+
+        ratingData = rawRatings
+            .Select(x => new RatingCount
+                {
+                    Star = $"{x.Rating} ★",
+                    Count = x.Count
+                })
+            .ToList();
+
+
+      // Average Rating
+        AvgRatingOverTime = await Db.Reviews
+            .Join(Db.Trip,
+                r => r.Id, 
+                t => t.Id,   
+                (r, t) => new
+                {
+                    t.DepartureTime,
+                    r.Rating
+                })
+            .GroupBy(x => new
+            {
+                x.DepartureTime.Year,
+                x.DepartureTime.Month
+            })
+            .OrderBy(g => g.Key.Year)
+            .ThenBy(g => g.Key.Month)
+            .Select(g => new AvgRatingOverTimeDto
+                {
+                    Label = $"{g.Key.Month:00}/{g.Key.Year}",
+                    AverageRating = g.Average(x => x.Rating)
+                })
+            .ToListAsync();
+
+        AvgRatingOverTime.Add(new AvgRatingOverTimeDto
+            {
+                Label = "02/2025",
+                AverageRating = 4.5
+            });
+
+        AvgRatingOverTime.Add(new AvgRatingOverTimeDto
+            {
+                Label = "03/2025",
+                AverageRating = 3.8
+            });
+
+
+    }
+
+    private async Task LoadAverageRatingOverTimeAsync()
+    {
+
+        var rawData = await Db.Reviews
+    .Join(Db.Trip,
+        r => r.Id,
+        t => t.Id,
+        (r, t) => new
+        {
+            t.DepartureTime,
+            r.Rating
+        })
+    .ToListAsync();
+
+
+        if (Db == null) return;
+
+        if (selectedFilter == TimeFilter.Daily)
+        {
+            AvgRatingOverTime = rawData
+                .GroupBy(x => x.DepartureTime.Date)
+                .Select(g => new AvgRatingOverTimeDto
+                {
+                    Label = g.Key.ToString("dd MMM"),
+                    AverageRating = g.Average(x => x.Rating)
+                })
+                .OrderBy(x => x.Label)
+                .ToList();
+        }
+
+
+        else if (selectedFilter == TimeFilter.Weekly)
+        {
+            AvgRatingOverTime = rawData
+                .GroupBy(x =>
+                    System.Globalization.ISOWeek.GetWeekOfYear(x.DepartureTime)
+                )
+                .Select(g => new AvgRatingOverTimeDto
+                {
+                    Label = $"Week {g.Key}",
+                    AverageRating = g.Average(x => x.Rating)
+                })
+                .OrderBy(x => x.Label)
+                .ToList();
+        }
+
+        else
+        {
+            AvgRatingOverTime = rawData
+                .GroupBy(x => new { x.DepartureTime.Year, x.DepartureTime.Month })
+                .Select(g => new AvgRatingOverTimeDto
+                {
+                    Label = $"{g.Key.Month:00}/{g.Key.Year}",
+                    AverageRating = g.Average(x => x.Rating)
+                })
+                .OrderBy(x => x.Label)
+                .ToList();
+        }
+
+    }
+
+
+}
+
+@if (Db == null)
+{
+    <p>Loading dashboard...</p>
+}
+else
+{
+    <!-- KPI -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card p-3">
+                <p class="text-muted">Total Buses</p>
+                <h4>@totalBuses</h4>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card p-3">
+                <p class="text-muted">Active Trips</p>
+                <h4>@activeTrips</h4>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card p-3">
+                <p class="text-muted">Total Passengers</p>
+                <h4>@totalPassengers</h4>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card p-3">
+                <p class="text-muted">Average Rating</p>
+                <h4>@averageRating.ToString("0.0")</h4>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row">
+
+        <div class="col-md-6">
+
+            <div class="card p-3 mb-3">
+                <h6 class="text-muted mb-1">Rating Distribution</h6>
+                <p class="text-muted mb-2" style="font-size:0.85rem;">
+                    X-axis: Star Rating | Y-axis: Number of Reviews
+                </p>
+
+                <RadzenChart Style="height:260px">
+                    <RadzenCategoryAxis />
+                    <RadzenValueAxis />
+                    <RadzenBarSeries Data="@ratingData"
+                                     CategoryProperty="Star"
+                                     ValueProperty="Count"
+                                     Title="Reviews" />
+                </RadzenChart>
+            </div>
+
+            <div class="card p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-muted mb-0">Average Rating Over Time</h6>
+
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn @(selectedFilter == TimeFilter.Daily ? "btn-dark" : "btn-outline-dark")"
+                                @onclick="async () => { selectedFilter = TimeFilter.Daily; await LoadAverageRatingOverTimeAsync(); }">
+                            Daily
+                        </button>
+
+                        <button class="btn @(selectedFilter == TimeFilter.Weekly ? "btn-dark" : "btn-outline-dark")"
+                                @onclick="async () => { selectedFilter = TimeFilter.Weekly; await LoadAverageRatingOverTimeAsync(); }">
+                            Weekly
+                        </button>
+
+                        <button class="btn @(selectedFilter == TimeFilter.Monthly ? "btn-dark" : "btn-outline-dark")"
+                                @onclick="async () => { selectedFilter = TimeFilter.Monthly; await LoadAverageRatingOverTimeAsync(); }">
+                            Monthly
+                        </button>
+                    </div>
+                </div>
+
+                <RadzenChart Style="height:200px">
+                    <RadzenCategoryAxis />
+                    <RadzenValueAxis Min="1" Max="5" />
+                    <RadzenLineSeries Data="@AvgRatingOverTime"
+                                      CategoryProperty="Label"
+                                      ValueProperty="AverageRating"
+                                      Title="Avg Rating" />
+                </RadzenChart>
+            </div>
+
+            <div class="card p-3 mb-3">
+                <h6 class="text-muted mb-2">Trips by Status</h6>
+
+                <RadzenChart Style="height:280px">
+                    <RadzenDonutSeries Data="@tripStatusData"
+                                       CategoryProperty="Status"
+                                       ValueProperty="Count"
+                                       Title="Trips" />
+                </RadzenChart>
+
+                <ul class="mt-2 text-muted" style="font-size:0.85rem;">
+                    @foreach (var item in tripStatusData)
+                    {
+                        <li>
+            @item.Status: @item.Percentage.ToString("0")%
+        </li>
+                    }
+                </ul>
+
+                <div class="mt-2 text-muted" style="font-size:0.85rem;">
+                    Distribution of trips by current status
+                </div>
+            </div>
+
+
+        </div>
+
+        <div class="col-md-6">
+
+            <div class="card p-3 mb-3">
+                <p class="text-muted">Upcoming Trips</p>
+                <h4>@upcomingTrips.Count</h4>
+                <small>Scheduled</small>
+            </div>
+
+            <div class="card p-3">
+                <h6 class="text-muted mb-3">Past Trips</h6>
+
+                @foreach (var trip in pastTrips)
+                {
+                    <NavLink href="@($"/trips/details/{trip.Id}")"
+                             class="text-decoration-none text-dark">
+
+                        <div class="border rounded p-3 mb-3 hover-card">
+                            <strong>
+                                @trip.Route.OriginCity → @trip.Route.DestinationCity
+                            </strong>
+
+                            <div class="d-flex justify-content-between mt-1">
+                                <small>@trip.DepartureTime.ToString("dd MMM")</small>
+                                <span class="badge bg-secondary">@trip.Status</span>
+                            </div>
+                        </div>
+
+                    </NavLink>
+                }
+            </div>
+        </div>
+    </div>
+}
+

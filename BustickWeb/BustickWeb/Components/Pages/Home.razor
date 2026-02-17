@@ -1,0 +1,126 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+@using Microsoft.EntityFrameworkCore
+@using DataAccess
+@using BustickWeb.Data
+
+@inject IDbContextFactory<BustickWebContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Home</PageTitle>
+
+<div class="home-hero d-flex align-items-center justify-content-center" style="min-height: 80vh; background-color: #f8f9fa;">
+    <div class="home-center text-center p-5 bg-white shadow rounded" style="max-width: 900px; width: 100%;">
+        <div class="home-title h2 mb-2">Search Your Trip</div>
+        <div class="home-subtitle text-muted mb-4">Find and book your intercity bus tickets</div>
+
+        <div class="home-searchbox row g-3 align-items-end">
+
+            <div class="col-md-3 text-start">
+                <label class="form-label fw-bold small">From</label>
+                <select class="form-select" value="@fromCity" @onchange="OnFromChangedEvent">
+                    <option value="">Select City</option>
+                    @foreach (var c in cities)
+                    {
+                        <option value="@c">@c</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-3 text-start">
+                <label class="form-label fw-bold small">To</label>
+                <select class="form-select" @bind="toCity">
+                    <option value="">Select City</option>
+                    @foreach (var c in ToCities)
+                    {
+                        <option value="@c">@c</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-3 text-start">
+                <label class="form-label fw-bold small">Date</label>
+                <input class="form-control" type="date"
+                       @bind="travelDate"
+                       @bind:format="yyyy-MM-dd" />
+            </div>
+
+            <div class="col-md-3">
+                <button class="btn btn-dark w-100" @onclick="SearchTrips">Search Trips</button>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="alert alert-danger mt-3">@error</div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<string> cities = new();
+    private string? fromCity;
+    private string? toCity;
+    private DateTime travelDate = DateTime.Today;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var db = await DbFactory.CreateDbContextAsync();
+
+            // Fetch
+            var raw = await db.Set<Route>().AsNoTracking()
+                .Select(r => new { r.OriginCity, r.DestinationCity })
+                .ToListAsync();
+
+            cities = raw
+                .SelectMany(x => new[] { x.OriginCity, x.DestinationCity })
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            error = "Error loading cities: " + ex.Message;
+        }
+    }
+
+    private void OnFromChangedEvent(ChangeEventArgs e)
+    {
+        fromCity = e.Value?.ToString();
+        error = null;
+
+        if (!string.IsNullOrWhiteSpace(fromCity) &&
+            !string.IsNullOrWhiteSpace(toCity) &&
+            string.Equals(fromCity.Trim(), toCity.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            toCity = null;
+        }
+    }
+
+    // Filter
+    private IEnumerable<string> ToCities =>
+        string.IsNullOrWhiteSpace(fromCity)
+            ? cities
+            : cities.Where(c => !c.Equals(fromCity.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private void SearchTrips()
+    {
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(fromCity) || string.IsNullOrWhiteSpace(toCity))
+        {
+            error = "Please select From and To cities.";
+            return;
+        }
+
+        var dateStr = travelDate.ToString("yyyy-MM-dd");
+
+        Nav.NavigateTo($"/trip-selection?from={Uri.EscapeDataString(fromCity.Trim())}&to={Uri.EscapeDataString(toCity.Trim())}&date={dateStr}");
+    }
+}
